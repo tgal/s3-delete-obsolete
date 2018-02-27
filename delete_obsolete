@@ -1,52 +1,59 @@
 #!/usr/bin/python
 
-import boto3
-import grandfatherson
 import argparse
+import boto3
 import datetime
 import humanize
 
+import grandfatherson
+
+
 def delete_obsolete(bucket, pattern, hours, days, weeks, months, years, dryrun=False):
-  report = dict()
-  b = boto3.resource('s3').Bucket(bucket)
-  backups = dict()
-  for k in b.objects.all():
-    report[k.key] = set()
-    try:
-      dt = datetime.datetime.strptime(k.key, pattern)
-      backups[dt] = k
-    except ValueError:
-      report[k.key].add('i')
-  if len(backups) > 1:
-    backup_list = sorted(backups.keys())
-    for b in sorted(grandfatherson.to_delete(backup_list, hours=hours, days=days, weeks=weeks, months=months, years=years, now=backup_list[-2])):
-      report[backups[b].key].add('d')
-      if not dryrun:
-        backups[b].delete()
-  if dryrun:
-    for b in sorted(report):
-      flags = ''.join(report[b])
-      print '%-3s   %s' % (flags, b)
-    
+    report = dict()
+    b = boto3.resource('s3').Bucket(bucket)
+    backups = dict()
+    for k in b.objects.all():
+        report[k.key] = set()
+        try:
+            dt = datetime.datetime.strptime(k.key, pattern)
+            backups[dt] = k
+        except ValueError:
+            report[k.key].add('i')
+    if len(backups) > 1:
+        backup_list = sorted(backups.keys())
+        for b in sorted(
+                grandfatherson.to_delete(backup_list, hours=hours, days=days, weeks=weeks, months=months, years=years,
+                                         now=backup_list[-2])):
+            report[backups[b].key].add('d')
+            if not dryrun:
+                backups[b].delete()
+    if dryrun:
+        for b in sorted(report):
+            flags = ''.join(report[b])
+            print '%-3s   %s' % (flags, b)
+
 
 def list_keys(bucket):
-  b = boto3.resource('s3').Bucket(bucket)
-  for k in sorted(b.objects.all(), key=lambda x: x.last_modified):
-    print '%s   %-8s   %s' % (k.last_modified, humanize.naturalsize(k.size), k.key)
+    b = boto3.resource('s3').Bucket(bucket)
+    for k in sorted(b.objects.all(), key=lambda x: x.last_modified):
+        print '%s   %-8s   %s' % (k.last_modified, humanize.naturalsize(k.size), k.key)
+
 
 ap = argparse.ArgumentParser(add_help=False)
 ap.add_argument('bucket', help='the bucket')
 ap.add_argument('--help', action='help')
 ap.add_argument('-p', '--pattern', help='strptime pattern of the backup archives')
-ap.add_argument('-n', '--dryrun', action='store_true', help='don\'t actually delete archives, just show what would be done')
-ap.add_argument('-h', '--hours',  type=int, default=24, help='hours of backup to retain, default %(default)s')
-ap.add_argument('-d', '--days',   type=int, default=7,  help='days of backup to retain, default %(default)s')
-ap.add_argument('-w', '--weeks',  type=int, default=3,  help='weeks of backup to retain, default %(default)s')
-ap.add_argument('-m', '--months', type=int, default=3,  help='months of backup to retain, default %(default)s')
-ap.add_argument('-y', '--years',  type=int, default=1,  help='years of backup to retain, default %(default)s')
+ap.add_argument('-n', '--dryrun', action='store_true',
+                help='don\'t actually delete archives, just show what would be done')
+ap.add_argument('-h', '--hours', type=int, default=24, help='hours of backup to retain, default %(default)s')
+ap.add_argument('-d', '--days', type=int, default=7, help='days of backup to retain, default %(default)s')
+ap.add_argument('-w', '--weeks', type=int, default=3, help='weeks of backup to retain, default %(default)s')
+ap.add_argument('-m', '--months', type=int, default=3, help='months of backup to retain, default %(default)s')
+ap.add_argument('-y', '--years', type=int, default=1, help='years of backup to retain, default %(default)s')
 args = ap.parse_args()
 
 if args.pattern:
-  delete_obsolete(args.bucket, args.pattern, args.hours, args.days, args.weeks, args.months, args.years, dryrun=args.dryrun)
+    delete_obsolete(args.bucket, args.pattern, args.hours, args.days, args.weeks, args.months, args.years,
+                    dryrun=args.dryrun)
 else:
-  list_keys(args.bucket)
+    list_keys(args.bucket)
